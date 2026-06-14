@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  overflow: hidden;
+  cursor:
+    url("../public/cursor.svg") 32 32,
+    auto;
+}
+
+button,
+a,
+.invite-btn {
+  cursor:
+    url("/public/cursor-8.svg") 32 32,
+    pointer;
+}
+
+.eight-svg {
+  width: 450px;
+}
