@@ -37,7 +37,7 @@ export default function Section3() {
       <section ref={sectionRef} className="video-section">
         <video
           ref={videoRef}
-          src="../../public/Komp 1 (1).mp4"
+          src="https://9da97esnbfzl3gah.public.blob.vercel-storage.com/109298.mp4"
           loop
           playsInline
           preload="auto"

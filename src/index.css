@@ -6,7 +6,8 @@ html,
 body {
   overflow: hidden;
   cursor:
-    url("../public/cursor.svg") 32 32,
+    url("https://9da97esnbfzl3gah.public.blob.vercel-storage.com/cursor.svg") 32
+      32,
     auto;
 }
 
@@ -14,7 +15,8 @@ button,
 a,
 .invite-btn {
   cursor:
-    url("/public/cursor-8.svg") 32 32,
+    url("https://9da97esnbfzl3gah.public.blob.vercel-storage.com/cursor.svg") 32
+      32,
     pointer;
 }
 
