@@ -1,6 +1,7 @@
 @font-face {
   font-family: "Montserrat";
-  src: url("/public/Montserrat-VariableFont_wght.ttf") format("truetype");
+  src: url("https://9da97esnbfzl3gah.public.blob.vercel-storage.com/Montserrat-VariableFont_wght.ttf")
+    format("truetype");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
