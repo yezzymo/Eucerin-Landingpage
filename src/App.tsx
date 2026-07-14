@@ -6,7 +6,7 @@ import "./styles/fullpage.css";
 
 export default function App() {
   const sections = [<Section1 />, <Section2 />, <ScrollVideoSection />];
-  const { current, goTo, containerRef } = useFullPage(sections.length, 800);
+  const { current, goTo, containerRef } = useFullPage(sections.length);
 
   return (
     <>

@@ -445,9 +445,12 @@ body,
   height: 300dvh;
   min-height: 300vh;
   min-height: 300dvh;
+  /* A sticky child cannot escape an overflow-clipped ancestor in Safari. */
+  overflow: visible;
 }
 
 .scroll-video-sticky {
+  position: -webkit-sticky;
   position: sticky;
   top: 0;
   width: 100%;
