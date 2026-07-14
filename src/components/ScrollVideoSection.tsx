@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 const VIDEO_SRC =
   "https://9da97esnbfzl3gah.public.blob.vercel-storage.com/ECN_Activia_Moodfilm_2025_SNIPPET1.mp4";
 const SCRUB_DISTANCE = 3600;
-const TOUCH_SCRUB_DISTANCE = 1200;
 const MIN_FRAME_STEP = 1 / 30;
 const WHEEL_DEAD_ZONE = 6;
 
@@ -19,6 +18,10 @@ export default function ScrollVideoSection() {
     const video = videoRef.current;
 
     if (!section || !video) return;
+
+    const usesNativeScroll = window.matchMedia(
+      "(hover: none), (pointer: coarse), (max-width: 768px)",
+    ).matches;
 
     const requestNextFrame = () => {
       if (animationFrameRef.current !== undefined || video.seeking) return;
@@ -37,7 +40,10 @@ export default function ScrollVideoSection() {
       // Move by small steps and wait for each seek to finish. Setting currentTime
       // on every animation frame while a seek is pending makes browsers discard
       // decoded frames, which is the main source of choppy scroll playback.
-      const maxStep = Math.max(MIN_FRAME_STEP, video.duration / 180);
+      const maxStep = Math.max(
+        MIN_FRAME_STEP,
+        video.duration / (usesNativeScroll ? 60 : 180),
+      );
       const step =
         Math.sign(difference) * Math.min(Math.abs(difference), maxStep);
       video.currentTime += step;
@@ -85,45 +91,63 @@ export default function ScrollVideoSection() {
       scrubBy(event.deltaY, SCRUB_DISTANCE);
     };
 
-    let lastTouchY = 0;
+    const scrollContainer = section.closest<HTMLElement>(".fp-container");
 
-    const handleTouchStart = (event: TouchEvent) => {
-      lastTouchY = event.touches[0]?.clientY ?? 0;
+    const updateFromNativeScroll = () => {
+      if (
+        !usesNativeScroll ||
+        !scrollContainer ||
+        !Number.isFinite(video.duration) ||
+        video.duration <= 0
+      ) {
+        return;
+      }
+
+      const sectionWrapper = section.parentElement;
+      if (!sectionWrapper) return;
+
+      const scrollRange = Math.max(
+        1,
+        section.offsetHeight - scrollContainer.clientHeight,
+      );
+      const progress = Math.min(
+        1,
+        Math.max(
+          0,
+          (scrollContainer.scrollTop - sectionWrapper.offsetTop) / scrollRange,
+        ),
+      );
+
+      targetTimeRef.current = progress * video.duration;
+      requestNextFrame();
     };
 
-    const handleTouchMove = (event: TouchEvent) => {
-      if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+    let videoUnlocked = false;
+    const unlockVideoForIos = () => {
+      if (!usesNativeScroll || videoUnlocked) return;
+      videoUnlocked = true;
 
-      const currentTouchY = event.touches[0]?.clientY;
-      if (currentTouchY === undefined) return;
-
-      // Finger up means forward, finger down means backward.
-      const deltaY = lastTouchY - currentTouchY;
-      lastTouchY = currentTouchY;
-
-      if (Math.abs(deltaY) < 0.5) return;
-
-      const atBeginning =
-        targetTimeRef.current <= 0.01 && video.currentTime <= 0.03;
-
-      // Once the first frame is reached, a downward finger movement scrolls
-      // the page back to the preceding section as usual.
-      if (deltaY < 0 && atBeginning) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      scrubBy(deltaY, TOUCH_SCRUB_DISTANCE);
+      // A user gesture unlocks frame seeking in iOS Safari, including when
+      // autoplay is disabled by Low Power Mode.
+      void video
+        .play()
+        .then(() => video.pause())
+        .catch(() => {
+          videoUnlocked = false;
+        });
     };
 
     section.addEventListener("wheel", handleWheel, { passive: false });
-    section.addEventListener("touchstart", handleTouchStart, { passive: true });
-    section.addEventListener("touchmove", handleTouchMove, { passive: false });
+    section.addEventListener("touchstart", unlockVideoForIos, { passive: true });
+    scrollContainer?.addEventListener("scroll", updateFromNativeScroll, {
+      passive: true,
+    });
     video.addEventListener("seeked", handleSeeked);
 
     return () => {
       section.removeEventListener("wheel", handleWheel);
-      section.removeEventListener("touchstart", handleTouchStart);
-      section.removeEventListener("touchmove", handleTouchMove);
+      section.removeEventListener("touchstart", unlockVideoForIos);
+      scrollContainer?.removeEventListener("scroll", updateFromNativeScroll);
       video.removeEventListener("seeked", handleSeeked);
       if (animationFrameRef.current !== undefined) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -143,20 +167,22 @@ export default function ScrollVideoSection() {
 
   return (
     <div ref={sectionRef} className="section scroll-video-section">
-      <video
-        ref={videoRef}
-        className="scroll-video"
-        src={VIDEO_SRC}
-        muted
-        playsInline
-        preload="auto"
-        onLoadedMetadata={handleLoadedMetadata}
-        aria-label="Eucerin mood film controlled by scrolling"
-      />
+      <div className="scroll-video-sticky">
+        <video
+          ref={videoRef}
+          className="scroll-video"
+          src={VIDEO_SRC}
+          muted
+          playsInline
+          preload="auto"
+          onLoadedMetadata={handleLoadedMetadata}
+          aria-label="Eucerin mood film controlled by scrolling"
+        />
 
-      <div className={`scroll-video-hint ${isReady ? "is-ready" : ""}`}>
-        <span className="scroll-video-line" />
-        <span>{isReady ? "SCROLL / SWIPE TO EXPLORE" : "LOADING FILM"}</span>
+        <div className={`scroll-video-hint ${isReady ? "is-ready" : ""}`}>
+          <span className="scroll-video-line" />
+          <span>{isReady ? "SCROLL / SWIPE TO EXPLORE" : "LOADING FILM"}</span>
+        </div>
       </div>
     </div>
   );
