@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 
 export default function Section3() {
-  const sectionRef = useRef(null);
-  const videoRef = useRef(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const section = sectionRef.current;

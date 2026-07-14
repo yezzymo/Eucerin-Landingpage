@@ -93,8 +93,8 @@ body,
 
 .follow-text {
   font-family: "Montserrat";
-  font-weight: 700;
-  font-size: clamp(1.6rem, 9.5vw, 5.8rem);
+  font-weight: 400;
+  font-size: clamp(1.6rem, 2.5vw, 5.8rem);
   color: rgba(255, 255, 255, 0.92);
   letter-spacing: 0.04em;
   text-shadow: 0 0 40px rgba(80, 200, 200, 0.3);
@@ -399,4 +399,75 @@ body,
   margin: auto;
   height: auto;
   display: block;
+}
+
+/* ──────────── Section 4 — Scroll-controlled mood film ──────────── */
+.scroll-video-section {
+  background: #000;
+}
+
+.scroll-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.scroll-video-section::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.08) 55%,
+    rgba(0, 0, 0, 0.58) 100%
+  );
+}
+
+.scroll-video-hint {
+  position: absolute;
+  bottom: clamp(2rem, 6vh, 4.5rem);
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  transform: translateX(-50%);
+  font-family: "Montserrat";
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  color: rgba(255, 255, 255, 0.78);
+  white-space: nowrap;
+  opacity: 0.55;
+  transition: opacity 0.5s ease;
+}
+
+.scroll-video-hint.is-ready {
+  opacity: 1;
+}
+
+.scroll-video-line {
+  width: 1px;
+  height: 36px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.9));
+  animation: scrollVideoLine 1.8s ease-in-out infinite;
+}
+
+@keyframes scrollVideoLine {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+    transform-origin: top;
+    opacity: 0.35;
+  }
+  50% {
+    transform: scaleY(1);
+    transform-origin: top;
+    opacity: 1;
+  }
 }
