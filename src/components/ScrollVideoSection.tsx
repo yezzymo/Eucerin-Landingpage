@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 const VIDEO_SRC =
   "https://9da97esnbfzl3gah.public.blob.vercel-storage.com/ECN_Activia_Moodfilm_2025_SNIPPET1.mp4";
 const SCRUB_DISTANCE = 3600;
+const TOUCH_SCRUB_DISTANCE = 1200;
 const MIN_FRAME_STEP = 1 / 30;
 const WHEEL_DEAD_ZONE = 6;
 
@@ -44,6 +45,24 @@ export default function ScrollVideoSection() {
 
     const handleSeeked = () => requestNextFrame();
 
+    const scrubBy = (delta: number, scrubDistance: number) => {
+      const secondsPerPixel = video.duration / scrubDistance;
+      const requestedTime = Math.min(
+        video.duration,
+        Math.max(0, targetTimeRef.current + delta * secondsPerPixel),
+      );
+
+      // Keep at most one decoded step queued so the film stops together with
+      // the wheel or finger instead of continuing with stored momentum.
+      const maxQueuedDistance = Math.max(MIN_FRAME_STEP, video.duration / 180);
+      targetTimeRef.current = Math.min(
+        video.currentTime + maxQueuedDistance,
+        Math.max(video.currentTime - maxQueuedDistance, requestedTime),
+      );
+
+      requestNextFrame();
+    };
+
     const handleWheel = (event: WheelEvent) => {
       if (!Number.isFinite(video.duration) || video.duration <= 0) return;
 
@@ -63,28 +82,48 @@ export default function ScrollVideoSection() {
       event.preventDefault();
       event.stopPropagation();
 
-      const secondsPerPixel = video.duration / SCRUB_DISTANCE;
-      const requestedTime = Math.min(
-        video.duration,
-        Math.max(0, targetTimeRef.current + event.deltaY * secondsPerPixel),
-      );
+      scrubBy(event.deltaY, SCRUB_DISTANCE);
+    };
 
-      // Keep at most one decoded step queued. This prevents a short trackpad
-      // swipe from building momentum that continues playing after the gesture.
-      const maxQueuedDistance = Math.max(MIN_FRAME_STEP, video.duration / 180);
-      targetTimeRef.current = Math.min(
-        video.currentTime + maxQueuedDistance,
-        Math.max(video.currentTime - maxQueuedDistance, requestedTime),
-      );
+    let lastTouchY = 0;
 
-      requestNextFrame();
+    const handleTouchStart = (event: TouchEvent) => {
+      lastTouchY = event.touches[0]?.clientY ?? 0;
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+
+      const currentTouchY = event.touches[0]?.clientY;
+      if (currentTouchY === undefined) return;
+
+      // Finger up means forward, finger down means backward.
+      const deltaY = lastTouchY - currentTouchY;
+      lastTouchY = currentTouchY;
+
+      if (Math.abs(deltaY) < 0.5) return;
+
+      const atBeginning =
+        targetTimeRef.current <= 0.01 && video.currentTime <= 0.03;
+
+      // Once the first frame is reached, a downward finger movement scrolls
+      // the page back to the preceding section as usual.
+      if (deltaY < 0 && atBeginning) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      scrubBy(deltaY, TOUCH_SCRUB_DISTANCE);
     };
 
     section.addEventListener("wheel", handleWheel, { passive: false });
+    section.addEventListener("touchstart", handleTouchStart, { passive: true });
+    section.addEventListener("touchmove", handleTouchMove, { passive: false });
     video.addEventListener("seeked", handleSeeked);
 
     return () => {
       section.removeEventListener("wheel", handleWheel);
+      section.removeEventListener("touchstart", handleTouchStart);
+      section.removeEventListener("touchmove", handleTouchMove);
       video.removeEventListener("seeked", handleSeeked);
       if (animationFrameRef.current !== undefined) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -117,7 +156,7 @@ export default function ScrollVideoSection() {
 
       <div className={`scroll-video-hint ${isReady ? "is-ready" : ""}`}>
         <span className="scroll-video-line" />
-        <span>{isReady ? "SCROLL TO EXPLORE" : "LOADING FILM"}</span>
+        <span>{isReady ? "SCROLL / SWIPE TO EXPLORE" : "LOADING FILM"}</span>
       </div>
     </div>
   );

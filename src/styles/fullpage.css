@@ -107,6 +107,15 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
+  width: min(550px, 80vw);
+}
+
+.eight-wrap .eight-svg {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  object-fit: contain;
 }
 
 .eight-num {
@@ -500,6 +509,19 @@ body,
     overflow: hidden;
     padding-top: max(1.5rem, env(safe-area-inset-top));
     padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  }
+
+  .section1-content {
+    width: 100%;
+    padding-inline: 1.25rem;
+  }
+
+  .follow-text {
+    font-size: clamp(1.8rem, 8vw, 2.5rem);
+  }
+
+  .eight-wrap {
+    width: min(78vw, 24rem);
   }
 
   .section2-content {
