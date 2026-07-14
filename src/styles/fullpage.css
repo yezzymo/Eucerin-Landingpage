@@ -539,6 +539,10 @@ body,
     height: auto;
     min-height: 100svh;
     overflow: hidden;
+    /* The wrapper is the top snap point. This second target forces iOS to
+       reveal the bottom of the tall section before Section 3 can be reached. */
+    scroll-snap-align: end;
+    scroll-snap-stop: always;
     padding-top: max(1.5rem, env(safe-area-inset-top));
     padding-bottom: max(2rem, env(safe-area-inset-bottom));
   }
