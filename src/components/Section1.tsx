@@ -9,7 +9,7 @@ export default function Section1() {
         <h1 className="follow-text">Follow the</h1>
         <div className="eight-wrap">
           <img
-            src="https://9da97esnbfzl3gah.public.blob.vercel-storage.com/8.svg"
+            src="https://9da97esnbfzl3gah.public.blob.vercel-storage.com/8-_1_.webp"
             alt="8"
             className="eight-svg"
           />

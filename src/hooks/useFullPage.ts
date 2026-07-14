@@ -30,6 +30,7 @@ export function useFullPage(totalSections: number) {
     if (!el) return;
 
     let frame: number | undefined;
+    let lastTouchY = 0;
 
     const updateCurrentSection = () => {
       frame = undefined;
@@ -65,11 +66,36 @@ export function useFullPage(totalSections: number) {
       }
     };
 
+    const handleTouchStart = (event: TouchEvent) => {
+      lastTouchY = event.touches[0]?.clientY ?? 0;
+    };
+
+    const preventBottomOverscroll = (event: TouchEvent) => {
+      const currentTouchY = event.touches[0]?.clientY;
+      if (currentTouchY === undefined) return;
+
+      const isAtBottom =
+        el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+      const isTryingToScrollFurtherDown = currentTouchY < lastTouchY;
+
+      if (isAtBottom && isTryingToScrollFurtherDown) {
+        event.preventDefault();
+      }
+
+      lastTouchY = currentTouchY;
+    };
+
     el.addEventListener("scroll", handleScroll, { passive: true });
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchmove", preventBottomOverscroll, {
+      passive: false,
+    });
     updateCurrentSection();
 
     return () => {
       el.removeEventListener("scroll", handleScroll);
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", preventBottomOverscroll);
       if (frame !== undefined) cancelAnimationFrame(frame);
     };
   }, [totalSections]);

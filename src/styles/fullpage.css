@@ -39,7 +39,7 @@ body,
   height: 100dvh;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: none;
   scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
   position: relative;

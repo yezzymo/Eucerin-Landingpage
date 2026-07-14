@@ -181,7 +181,7 @@ export default function ScrollVideoSection() {
 
         <div className={`scroll-video-hint ${isReady ? "is-ready" : ""}`}>
           <span className="scroll-video-line" />
-          <span>{isReady ? "SCROLL / SWIPE TO EXPLORE" : "LOADING FILM"}</span>
+          <span>{isReady ? "SCROLL TO EXPLORE" : "LOADING FILM"}</span>
         </div>
       </div>
     </div>
