@@ -20,6 +20,38 @@ export default function ScrollVideoSection() {
     const scrollContainer = section.closest<HTMLElement>(".fp-container");
     if (!scrollContainer) return;
 
+    const usesIosMediaEngine =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+    let iosSeekFrame: number | undefined;
+
+    const requestIosFrame = () => {
+      if (!usesIosMediaEngine || iosSeekFrame !== undefined) return;
+
+      iosSeekFrame = requestAnimationFrame(() => {
+        iosSeekFrame = undefined;
+
+        if (
+          video.readyState < HTMLMediaElement.HAVE_METADATA ||
+          !Number.isFinite(video.duration)
+        ) {
+          return;
+        }
+
+        const requestedTime = Math.min(
+          video.duration,
+          Math.max(0, targetTimeRef.current),
+        );
+
+        if (Math.abs(requestedTime - video.currentTime) > 1 / 120) {
+          // WebKit paints paused video frames more reliably when the latest
+          // scroll position is assigned directly instead of chaining seeks.
+          video.currentTime = requestedTime;
+        }
+      });
+    };
+
     const requestNextFrame = () => {
       if (animationFrameRef.current !== undefined || video.seeking) return;
 
@@ -43,7 +75,16 @@ export default function ScrollVideoSection() {
       video.currentTime += step;
     };
 
-    const handleSeeked = () => requestNextFrame();
+    const handleSeeked = () => {
+      if (usesIosMediaEngine) {
+        if (Math.abs(targetTimeRef.current - video.currentTime) > 1 / 60) {
+          requestIosFrame();
+        }
+        return;
+      }
+
+      requestNextFrame();
+    };
 
     // The section is a tall "scroll runway" (see .scroll-video-section in
     // fullpage.css). Video progress is simply how far the native scroll
@@ -66,7 +107,12 @@ export default function ScrollVideoSection() {
       );
 
       targetTimeRef.current = progress * video.duration;
-      requestNextFrame();
+
+      if (usesIosMediaEngine) {
+        requestIosFrame();
+      } else {
+        requestNextFrame();
+      }
     };
 
     let videoUnlocked = false;
@@ -87,7 +133,9 @@ export default function ScrollVideoSection() {
     scrollContainer.addEventListener("scroll", updateFromScroll, {
       passive: true,
     });
-    section.addEventListener("touchstart", unlockVideoForIos, { passive: true });
+    scrollContainer.addEventListener("touchstart", unlockVideoForIos, {
+      passive: true,
+    });
     video.addEventListener("seeked", handleSeeked);
 
     // Sync immediately in case the page mounts already scrolled into view
@@ -96,8 +144,11 @@ export default function ScrollVideoSection() {
 
     return () => {
       scrollContainer.removeEventListener("scroll", updateFromScroll);
-      section.removeEventListener("touchstart", unlockVideoForIos);
+      scrollContainer.removeEventListener("touchstart", unlockVideoForIos);
       video.removeEventListener("seeked", handleSeeked);
+      if (iosSeekFrame !== undefined) {
+        cancelAnimationFrame(iosSeekFrame);
+      }
       if (animationFrameRef.current !== undefined) {
         cancelAnimationFrame(animationFrameRef.current);
       }
