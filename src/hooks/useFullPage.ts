@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useFullPage(totalSections: number, scrollingSpeed = 700) {
   const [current, setCurrent] = useState(0);
@@ -39,11 +39,63 @@ export function useFullPage(totalSections: number, scrollingSpeed = 700) {
 
     isScrolling.current = true;
     setCurrent(index);
-    smoothScrollTo(index * window.innerHeight);
+    const target = containerRef.current?.children[index] as HTMLElement | undefined;
+    smoothScrollTo(target?.offsetTop ?? index * (containerRef.current?.clientHeight ?? 0));
   }, [totalSections, smoothScrollTo]);
 
   useEffect(() => {
-    let touchStart = 0;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const usesNativeTouchScroll = window.matchMedia(
+      "(hover: none), (pointer: coarse), (max-width: 768px)",
+    ).matches;
+
+    if (usesNativeTouchScroll) {
+      let frame: number | undefined;
+
+      const updateCurrentSection = () => {
+        frame = undefined;
+        const viewportCenter = el.scrollTop + el.clientHeight / 2;
+        let closestIndex = 0;
+        let closestDistance = Number.POSITIVE_INFINITY;
+
+        Array.from(el.children).forEach((child, index) => {
+          const section = child as HTMLElement;
+          const top = section.offsetTop;
+          const bottom = top + section.offsetHeight;
+          const distance =
+            viewportCenter < top
+              ? top - viewportCenter
+              : viewportCenter > bottom
+                ? viewportCenter - bottom
+                : 0;
+
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestIndex = index;
+          }
+        });
+
+        setCurrent((previous) =>
+          previous === closestIndex ? previous : closestIndex,
+        );
+      };
+
+      const handleNativeScroll = () => {
+        if (frame === undefined) {
+          frame = requestAnimationFrame(updateCurrentSection);
+        }
+      };
+
+      el.addEventListener("scroll", handleNativeScroll, { passive: true });
+      updateCurrentSection();
+
+      return () => {
+        el.removeEventListener("scroll", handleNativeScroll);
+        if (frame !== undefined) cancelAnimationFrame(frame);
+      };
+    }
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -57,40 +109,14 @@ export function useFullPage(totalSections: number, scrollingSpeed = 700) {
 
       isScrolling.current = true;
       setCurrent(next);
-      smoothScrollTo(next * window.innerHeight);
+      const target = el.children[next] as HTMLElement | undefined;
+      smoothScrollTo(target?.offsetTop ?? next * el.clientHeight);
     };
 
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStart = e.touches[0].clientY;
-    };
-
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (isScrolling.current) return;
-
-      const delta = touchStart - e.changedTouches[0].clientY;
-      if (Math.abs(delta) < 40) return;
-
-      const dir = delta > 0 ? 1 : -1;
-      const next = Math.min(Math.max(current + dir, 0), totalSections - 1);
-
-      if (next === current) return;
-
-      isScrolling.current = true;
-      setCurrent(next);
-      smoothScrollTo(next * window.innerHeight);
-    };
-
-    const el = containerRef.current;
-    if (!el) return;
-
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    el.addEventListener('touchstart', handleTouchStart, { passive: true });
-    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+    el.addEventListener("wheel", handleWheel, { passive: false });
 
     return () => {
-      el.removeEventListener('wheel', handleWheel);
-      el.removeEventListener('touchstart', handleTouchStart);
-      el.removeEventListener('touchend', handleTouchEnd);
+      el.removeEventListener("wheel", handleWheel);
     };
   }, [current, totalSections, smoothScrollTo]);
 

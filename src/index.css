@@ -22,4 +22,5 @@ a,
 
 .eight-svg {
   width: 550px;
+  max-width: 100%;
 }

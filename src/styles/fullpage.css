@@ -28,6 +28,7 @@ body,
 .fp-container {
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   position: relative;
 }
@@ -36,6 +37,7 @@ body,
   position: relative;
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -94,7 +96,7 @@ body,
 .follow-text {
   font-family: "Montserrat";
   font-weight: 400;
-  font-size: clamp(1.6rem, 2.5vw, 5.8rem);
+  font-size: clamp(2rem, 3.5vw, 5.8rem);
   color: rgba(255, 255, 255, 0.92);
   letter-spacing: 0.04em;
   text-shadow: 0 0 40px rgba(80, 200, 200, 0.3);
@@ -469,5 +471,89 @@ body,
     transform: scaleY(1);
     transform-origin: top;
     opacity: 1;
+  }
+}
+
+/* ──────────── Mobile / iOS Safari ──────────── */
+@media (hover: none), (pointer: coarse), (max-width: 768px) {
+  .fp-container {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scroll-snap-type: y proximity;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .fp-container > div {
+    scroll-snap-align: start;
+  }
+
+  .section {
+    min-height: 100svh;
+    height: 100dvh;
+  }
+
+  .section2 {
+    height: auto;
+    min-height: 100svh;
+    overflow: hidden;
+    padding-top: max(1.5rem, env(safe-area-inset-top));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  }
+
+  .section2-content {
+    width: 100%;
+    max-width: 38rem;
+    gap: 1rem;
+    padding: 2.5rem 1.25rem;
+  }
+
+  .invite-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.28em;
+  }
+
+  .invite-title {
+    font-size: clamp(1.7rem, 8vw, 2.25rem);
+    line-height: 1.18;
+  }
+
+  .invite-body {
+    font-size: 0.88rem;
+    line-height: 1.65;
+  }
+
+  .invite-details {
+    width: 100%;
+    gap: 1rem;
+  }
+
+  .detail-value {
+    font-size: 1rem;
+  }
+
+  .fp-nav {
+    right: max(0.8rem, env(safe-area-inset-right));
+    gap: 10px;
+  }
+
+  .scroll-video-hint {
+    bottom: max(2rem, calc(env(safe-area-inset-bottom) + 1rem));
+  }
+}
+
+@media (max-width: 480px) {
+  .invite-details {
+    flex-direction: column;
+  }
+
+  .detail-sep {
+    width: 44px;
+    height: 1px;
+  }
+
+  .invite-btn {
+    width: min(100%, 19rem);
   }
 }
