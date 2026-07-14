@@ -1,0 +1,64 @@
+name: Deploy to Vercel
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment
+        required: true
+        type: choice
+        default: preview
+        options:
+          - preview
+          - production
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel configuration
+        run: |
+          vercel pull \
+            --yes \
+            --environment="${{ inputs.environment }}" \
+            --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Build project
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+          else
+            vercel build --token="${{ secrets.VERCEL_TOKEN }}"
+          fi
+
+      - name: Deploy project
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            vercel deploy \
+              --prebuilt \
+              --prod \
+              --token="${{ secrets.VERCEL_TOKEN }}"
+          else
+            vercel deploy \
+              --prebuilt \
+              --token="${{ secrets.VERCEL_TOKEN }}"
+          fi
