@@ -25,19 +25,36 @@ body,
 }
 
 /* ──────────── Full-page container ──────────── */
+/*
+ * Native CSS scroll-snap drives section-to-section navigation. Each direct
+ * child snaps to its top edge and cannot be skipped over ("stop: always").
+ * A section only ever defines ONE snap point (its start) — so if a section
+ * is taller than the viewport (e.g. the scroll-video runway below), the
+ * user can freely keep scrolling inside it; snapping only kicks in again
+ * once the next section's start edge comes into range.
+ */
 .fp-container {
   width: 100%;
   height: 100vh;
   height: 100dvh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
   position: relative;
+}
+
+.fp-container > div {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 .section {
   position: relative;
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -413,14 +430,29 @@ body,
 }
 
 /* ──────────── Section 4 — Scroll-controlled mood film ──────────── */
+/*
+ * This section is a tall "scroll runway" (300vh). The video itself sits in
+ * a sticky wrapper pinned to the top of the viewport, and its playback
+ * position is driven directly by how far the native scroll has moved
+ * through the runway (see ScrollVideoSection.tsx). Because the runway has
+ * only one scroll-snap point (its own start), the browser lets the user
+ * scroll freely through all 300vh before snapping anywhere else.
+ */
 .scroll-video-section {
   background: #000;
+  display: block;
+  height: 300vh;
+  height: 300dvh;
+  min-height: 300vh;
+  min-height: 300dvh;
 }
 
 .scroll-video-sticky {
-  position: relative;
+  position: sticky;
+  top: 0;
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -493,21 +525,11 @@ body,
 /* ──────────── Mobile / iOS Safari ──────────── */
 @media (hover: none), (pointer: coarse), (max-width: 768px) {
   .fp-container {
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-    scroll-snap-type: y proximity;
     touch-action: pan-y;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .fp-container > div {
-    scroll-snap-align: start;
   }
 
   .section {
     min-height: 100svh;
-    height: 100dvh;
   }
 
   .section2 {
@@ -569,20 +591,6 @@ body,
 
   .scroll-video-hint {
     bottom: max(2rem, calc(env(safe-area-inset-bottom) + 1rem));
-  }
-
-  .scroll-video-section {
-    display: block;
-    height: 300svh;
-    min-height: 300svh;
-    overflow: visible;
-  }
-
-  .scroll-video-sticky {
-    position: sticky;
-    top: 0;
-    height: 100vh;
-    height: 100dvh;
   }
 }
 

@@ -2,9 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 const VIDEO_SRC =
   "https://9da97esnbfzl3gah.public.blob.vercel-storage.com/ECN_Activia_Moodfilm_2025_SNIPPET1.mp4";
-const SCRUB_DISTANCE = 3600;
 const MIN_FRAME_STEP = 1 / 30;
-const WHEEL_DEAD_ZONE = 6;
 
 export default function ScrollVideoSection() {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -19,9 +17,8 @@ export default function ScrollVideoSection() {
 
     if (!section || !video) return;
 
-    const usesNativeScroll = window.matchMedia(
-      "(hover: none), (pointer: coarse), (max-width: 768px)",
-    ).matches;
+    const scrollContainer = section.closest<HTMLElement>(".fp-container");
+    if (!scrollContainer) return;
 
     const requestNextFrame = () => {
       if (animationFrameRef.current !== undefined || video.seeking) return;
@@ -40,10 +37,7 @@ export default function ScrollVideoSection() {
       // Move by small steps and wait for each seek to finish. Setting currentTime
       // on every animation frame while a seek is pending makes browsers discard
       // decoded frames, which is the main source of choppy scroll playback.
-      const maxStep = Math.max(
-        MIN_FRAME_STEP,
-        video.duration / (usesNativeScroll ? 60 : 180),
-      );
+      const maxStep = Math.max(MIN_FRAME_STEP, video.duration / 90);
       const step =
         Math.sign(difference) * Math.min(Math.abs(difference), maxStep);
       video.currentTime += step;
@@ -51,60 +45,13 @@ export default function ScrollVideoSection() {
 
     const handleSeeked = () => requestNextFrame();
 
-    const scrubBy = (delta: number, scrubDistance: number) => {
-      const secondsPerPixel = video.duration / scrubDistance;
-      const requestedTime = Math.min(
-        video.duration,
-        Math.max(0, targetTimeRef.current + delta * secondsPerPixel),
-      );
-
-      // Keep at most one decoded step queued so the film stops together with
-      // the wheel or finger instead of continuing with stored momentum.
-      const maxQueuedDistance = Math.max(MIN_FRAME_STEP, video.duration / 180);
-      targetTimeRef.current = Math.min(
-        video.currentTime + maxQueuedDistance,
-        Math.max(video.currentTime - maxQueuedDistance, requestedTime),
-      );
-
-      requestNextFrame();
-    };
-
-    const handleWheel = (event: WheelEvent) => {
+    // The section is a tall "scroll runway" (see .scroll-video-section in
+    // fullpage.css). Video progress is simply how far the native scroll
+    // position has moved through that runway — no wheel-event hijacking,
+    // so it works identically for mouse wheel, trackpad, touch and keyboard,
+    // and never fights with the section-to-section scroll-snap.
+    const updateFromScroll = () => {
       if (!Number.isFinite(video.duration) || video.duration <= 0) return;
-
-      // Ignore the tiny deltas produced by resting fingers on a trackpad.
-      if (Math.abs(event.deltaY) < WHEEL_DEAD_ZONE) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-
-      const atBeginning =
-        targetTimeRef.current <= 0.01 && video.currentTime <= 0.03;
-
-      // At the first frame, let an upward scroll return to the previous section.
-      if (event.deltaY < 0 && atBeginning) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      scrubBy(event.deltaY, SCRUB_DISTANCE);
-    };
-
-    const scrollContainer = section.closest<HTMLElement>(".fp-container");
-
-    const updateFromNativeScroll = () => {
-      if (
-        !usesNativeScroll ||
-        !scrollContainer ||
-        !Number.isFinite(video.duration) ||
-        video.duration <= 0
-      ) {
-        return;
-      }
-
-      const sectionWrapper = section.parentElement;
-      if (!sectionWrapper) return;
 
       const scrollRange = Math.max(
         1,
@@ -114,7 +61,7 @@ export default function ScrollVideoSection() {
         1,
         Math.max(
           0,
-          (scrollContainer.scrollTop - sectionWrapper.offsetTop) / scrollRange,
+          (scrollContainer.scrollTop - section.offsetTop) / scrollRange,
         ),
       );
 
@@ -124,7 +71,7 @@ export default function ScrollVideoSection() {
 
     let videoUnlocked = false;
     const unlockVideoForIos = () => {
-      if (!usesNativeScroll || videoUnlocked) return;
+      if (videoUnlocked) return;
       videoUnlocked = true;
 
       // A user gesture unlocks frame seeking in iOS Safari, including when
@@ -137,17 +84,19 @@ export default function ScrollVideoSection() {
         });
     };
 
-    section.addEventListener("wheel", handleWheel, { passive: false });
-    section.addEventListener("touchstart", unlockVideoForIos, { passive: true });
-    scrollContainer?.addEventListener("scroll", updateFromNativeScroll, {
+    scrollContainer.addEventListener("scroll", updateFromScroll, {
       passive: true,
     });
+    section.addEventListener("touchstart", unlockVideoForIos, { passive: true });
     video.addEventListener("seeked", handleSeeked);
 
+    // Sync immediately in case the page mounts already scrolled into view
+    // (e.g. after a reload or a deep link to this section).
+    updateFromScroll();
+
     return () => {
-      section.removeEventListener("wheel", handleWheel);
+      scrollContainer.removeEventListener("scroll", updateFromScroll);
       section.removeEventListener("touchstart", unlockVideoForIos);
-      scrollContainer?.removeEventListener("scroll", updateFromNativeScroll);
       video.removeEventListener("seeked", handleSeeked);
       if (animationFrameRef.current !== undefined) {
         cancelAnimationFrame(animationFrameRef.current);
