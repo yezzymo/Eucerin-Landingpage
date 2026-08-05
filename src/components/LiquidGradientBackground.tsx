@@ -71,27 +71,43 @@ export default function NeatBackground() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    const gradient = new NeatGradient({
-      ref: canvasRef.current,
-      ...config,
-    });
+    const contextOptions: WebGLContextAttributes = {
+      alpha: true,
+      preserveDrawingBuffer: true,
+      antialias: true,
+    };
+    const supportsWebGL =
+      canvas.getContext("webgl2", contextOptions) ??
+      canvas.getContext("webgl", contextOptions);
+
+    if (!supportsWebGL) return;
+
+    let gradient: NeatGradient | undefined;
+
+    try {
+      gradient = new NeatGradient({
+        ref: canvas,
+        ...config,
+      });
+    } catch {
+      // The canvas keeps its CSS background when WebGL is unavailable or
+      // disabled, so the rest of the landing page remains fully usable.
+    }
 
     return () => {
-      gradient.destroy();
+      gradient?.destroy();
     };
   }, []);
 
   return (
     <canvas
       ref={canvasRef}
-      style={{
-        position: "fixed",
-        inset: 0,
-        width: "100%",
-        height: "100%",
-      }}
+      className="liquid-gradient-canvas"
+      aria-hidden="true"
     />
   );
 }

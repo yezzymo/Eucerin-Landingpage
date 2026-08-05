@@ -9,7 +9,9 @@ export default function ScrollVideoSection() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const targetTimeRef = useRef(0);
   const animationFrameRef = useRef<number>();
-  const [isReady, setIsReady] = useState(false);
+  const [videoStatus, setVideoStatus] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -162,8 +164,14 @@ export default function ScrollVideoSection() {
     video.pause();
     video.currentTime = 0;
     targetTimeRef.current = 0;
-    setIsReady(true);
+    setVideoStatus("ready");
   };
+
+  const statusText = {
+    loading: "LOADING FILM",
+    ready: "SCROLL TO EXPLORE",
+    error: "FILM UNAVAILABLE",
+  }[videoStatus];
 
   return (
     <div ref={sectionRef} className="section scroll-video-section">
@@ -176,12 +184,17 @@ export default function ScrollVideoSection() {
           playsInline
           preload="auto"
           onLoadedMetadata={handleLoadedMetadata}
+          onError={() => setVideoStatus("error")}
           aria-label="Eucerin mood film controlled by scrolling"
         />
 
-        <div className={`scroll-video-hint ${isReady ? "is-ready" : ""}`}>
+        <div
+          className={`scroll-video-hint ${videoStatus === "ready" ? "is-ready" : ""} ${videoStatus === "error" ? "has-error" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
           <span className="scroll-video-line" />
-          <span>{isReady ? "SCROLL TO EXPLORE" : "LOADING FILM"}</span>
+          <span>{statusText}</span>
         </div>
       </div>
     </div>

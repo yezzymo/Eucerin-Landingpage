@@ -20,7 +20,13 @@ export function useFullPage(totalSections: number) {
       if (!el || index < 0 || index >= totalSections) return;
 
       const target = el.children[index] as HTMLElement | undefined;
-      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      target?.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start",
+      });
     },
     [totalSections],
   );
