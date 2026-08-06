@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 const VIDEO_SRC =
   "https://9da97esnbfzl3gah.public.blob.vercel-storage.com/eucerin-mood-film-scroll.mp4";
 const MIN_SEEK_DIFFERENCE = 1 / 120;
+const TOUCH_SCROLL_IDLE_DELAY = 120;
 
 export default function ScrollVideoSection() {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -63,9 +64,9 @@ export default function ScrollVideoSection() {
       animationFrameRef.current = undefined;
     };
 
-    // Page-end UI follows the actual container position, including native
-    // inertia. Video seeking is intentionally handled by the user-input
-    // listeners below so it stops the instant that input ends.
+    // Page-end UI follows the actual container position. Video seeking is
+    // gated by user input, follows native touch inertia, and stops when that
+    // user-initiated scroll becomes idle.
     const updatePageEndState = () => {
       const hasReachedPageEnd =
         scrollContainer.scrollTop + scrollContainer.clientHeight >=
@@ -92,6 +93,8 @@ export default function ScrollVideoSection() {
     };
 
     let isTouchScrolling = false;
+    let touchHasEnded = false;
+    let touchScrollEndTimer: number | undefined;
     let isKeyboardScrolling = false;
     const scrollKeys = new Set([
       "ArrowDown",
@@ -103,22 +106,50 @@ export default function ScrollVideoSection() {
       " ",
     ]);
 
+    const clearTouchScrollEndTimer = () => {
+      if (touchScrollEndTimer === undefined) return;
+      window.clearTimeout(touchScrollEndTimer);
+      touchScrollEndTimer = undefined;
+    };
+
+    const finishTouchScrolling = () => {
+      clearTouchScrollEndTimer();
+      isTouchScrolling = false;
+      touchHasEnded = false;
+      cancelVideoUpdate();
+      video.pause();
+    };
+
+    const waitForTouchScrollEnd = () => {
+      clearTouchScrollEndTimer();
+      touchScrollEndTimer = window.setTimeout(
+        finishTouchScrolling,
+        TOUCH_SCROLL_IDLE_DELAY,
+      );
+    };
+
     const handleTouchStart = () => {
+      clearTouchScrollEndTimer();
       isTouchScrolling = true;
+      touchHasEnded = false;
       if (needsTouchMediaUnlock) unlockVideoForIos();
     };
 
     const stopTouchScrolling = () => {
-      isTouchScrolling = false;
-      cancelVideoUpdate();
-      video.pause();
+      // Safari applies fast-swipe inertia after touchend. Keep the interaction
+      // active only while the scroll position is still changing.
+      touchHasEnded = true;
+      requestVideoUpdate();
+      waitForTouchScrollEnd();
+    };
+
+    const cancelTouchScrolling = () => {
+      finishTouchScrolling();
     };
 
     const handleWindowBlur = () => {
-      isTouchScrolling = false;
+      finishTouchScrolling();
       isKeyboardScrolling = false;
-      cancelVideoUpdate();
-      video.pause();
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -147,7 +178,10 @@ export default function ScrollVideoSection() {
 
     const handleScroll = () => {
       updatePageEndState();
-      if (isTouchScrolling || isKeyboardScrolling) requestVideoUpdate();
+      if (isTouchScrolling || isKeyboardScrolling) {
+        requestVideoUpdate();
+      }
+      if (isTouchScrolling && touchHasEnded) waitForTouchScrollEnd();
     };
 
     scrollContainer.addEventListener("scroll", handleScroll, {
@@ -165,7 +199,7 @@ export default function ScrollVideoSection() {
     scrollContainer.addEventListener("touchend", stopTouchScrolling, {
       passive: true,
     });
-    scrollContainer.addEventListener("touchcancel", stopTouchScrolling, {
+    scrollContainer.addEventListener("touchcancel", cancelTouchScrolling, {
       passive: true,
     });
     window.addEventListener("keydown", handleKeyDown);
@@ -174,7 +208,8 @@ export default function ScrollVideoSection() {
     video.addEventListener("loadedmetadata", updateVideoFromScroll);
 
     // Sync once on mount for reloads and deep links. Subsequent frame changes
-    // only come from wheel, touchmove, or an actively held scroll key.
+    // only come from an active wheel, touch (including native inertia), or
+    // held scroll-key session.
     updatePageEndState();
     updateVideoFromScroll();
 
@@ -184,11 +219,12 @@ export default function ScrollVideoSection() {
       scrollContainer.removeEventListener("touchstart", handleTouchStart);
       scrollContainer.removeEventListener("touchmove", requestVideoUpdate);
       scrollContainer.removeEventListener("touchend", stopTouchScrolling);
-      scrollContainer.removeEventListener("touchcancel", stopTouchScrolling);
+      scrollContainer.removeEventListener("touchcancel", cancelTouchScrolling);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleWindowBlur);
       video.removeEventListener("loadedmetadata", updateVideoFromScroll);
+      clearTouchScrollEndTimer();
       cancelVideoUpdate();
     };
   }, []);
