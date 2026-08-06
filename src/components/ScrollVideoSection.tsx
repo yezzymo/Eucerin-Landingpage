@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 
 const VIDEO_SRC =
-  "https://9da97esnbfzl3gah.public.blob.vercel-storage.com/ECN_Activia_Moodfilm_2025_SNIPPET1.mp4";
-const MIN_FRAME_STEP = 1 / 30;
+  "https://9da97esnbfzl3gah.public.blob.vercel-storage.com/eucerin-mood-film-scroll.mp4";
+const MIN_SEEK_DIFFERENCE = 1 / 120;
 
 export default function ScrollVideoSection() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const targetTimeRef = useRef(0);
   const animationFrameRef = useRef<number>();
-  const [videoStatus, setVideoStatus] = useState<
-    "loading" | "ready" | "error"
-  >("loading");
+  const isAtPageEndRef = useRef(false);
+  const [videoStatus, setVideoStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+  const [isAtPageEnd, setIsAtPageEnd] = useState(false);
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -22,78 +23,11 @@ export default function ScrollVideoSection() {
     const scrollContainer = section.closest<HTMLElement>(".fp-container");
     if (!scrollContainer) return;
 
-    const usesIosMediaEngine =
+    const needsTouchMediaUnlock =
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-    let iosSeekFrame: number | undefined;
-
-    const requestIosFrame = () => {
-      if (!usesIosMediaEngine || iosSeekFrame !== undefined) return;
-
-      iosSeekFrame = requestAnimationFrame(() => {
-        iosSeekFrame = undefined;
-
-        if (
-          video.readyState < HTMLMediaElement.HAVE_METADATA ||
-          !Number.isFinite(video.duration)
-        ) {
-          return;
-        }
-
-        const requestedTime = Math.min(
-          video.duration,
-          Math.max(0, targetTimeRef.current),
-        );
-
-        if (Math.abs(requestedTime - video.currentTime) > 1 / 120) {
-          // WebKit paints paused video frames more reliably when the latest
-          // scroll position is assigned directly instead of chaining seeks.
-          video.currentTime = requestedTime;
-        }
-      });
-    };
-
-    const requestNextFrame = () => {
-      if (animationFrameRef.current !== undefined || video.seeking) return;
-
-      animationFrameRef.current = requestAnimationFrame(updateVideoFrame);
-    };
-
-    const updateVideoFrame = () => {
-      animationFrameRef.current = undefined;
-      const difference = targetTimeRef.current - video.currentTime;
-
-      if (Math.abs(difference) < MIN_FRAME_STEP) {
-        return;
-      }
-
-      // Move by small steps and wait for each seek to finish. Setting currentTime
-      // on every animation frame while a seek is pending makes browsers discard
-      // decoded frames, which is the main source of choppy scroll playback.
-      const maxStep = Math.max(MIN_FRAME_STEP, video.duration / 90);
-      const step =
-        Math.sign(difference) * Math.min(Math.abs(difference), maxStep);
-      video.currentTime += step;
-    };
-
-    const handleSeeked = () => {
-      if (usesIosMediaEngine) {
-        if (Math.abs(targetTimeRef.current - video.currentTime) > 1 / 60) {
-          requestIosFrame();
-        }
-        return;
-      }
-
-      requestNextFrame();
-    };
-
-    // The section is a tall "scroll runway" (see .scroll-video-section in
-    // fullpage.css). Video progress is simply how far the native scroll
-    // position has moved through that runway — no wheel-event hijacking,
-    // so it works identically for mouse wheel, trackpad, touch and keyboard,
-    // and never fights with the section-to-section scroll-snap.
-    const updateFromScroll = () => {
+    const updateVideoFromScroll = () => {
       if (!Number.isFinite(video.duration) || video.duration <= 0) return;
 
       const scrollRange = Math.max(
@@ -107,13 +41,38 @@ export default function ScrollVideoSection() {
           (scrollContainer.scrollTop - section.offsetTop) / scrollRange,
         ),
       );
+      const requestedTime = progress * video.duration;
 
-      targetTimeRef.current = progress * video.duration;
+      if (Math.abs(requestedTime - video.currentTime) > MIN_SEEK_DIFFERENCE) {
+        video.currentTime = requestedTime;
+      }
+    };
 
-      if (usesIosMediaEngine) {
-        requestIosFrame();
-      } else {
-        requestNextFrame();
+    const requestVideoUpdate = () => {
+      if (animationFrameRef.current !== undefined) return;
+
+      animationFrameRef.current = requestAnimationFrame(() => {
+        animationFrameRef.current = undefined;
+        updateVideoFromScroll();
+      });
+    };
+
+    const cancelVideoUpdate = () => {
+      if (animationFrameRef.current === undefined) return;
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = undefined;
+    };
+
+    // Page-end UI follows the actual container position, including native
+    // inertia. Video seeking is intentionally handled by the user-input
+    // listeners below so it stops the instant that input ends.
+    const updatePageEndState = () => {
+      const hasReachedPageEnd =
+        scrollContainer.scrollTop + scrollContainer.clientHeight >=
+        scrollContainer.scrollHeight - 1;
+      if (hasReachedPageEnd !== isAtPageEndRef.current) {
+        isAtPageEndRef.current = hasReachedPageEnd;
+        setIsAtPageEnd(hasReachedPageEnd);
       }
     };
 
@@ -132,28 +91,105 @@ export default function ScrollVideoSection() {
         });
     };
 
-    scrollContainer.addEventListener("scroll", updateFromScroll, {
-      passive: true,
-    });
-    scrollContainer.addEventListener("touchstart", unlockVideoForIos, {
-      passive: true,
-    });
-    video.addEventListener("seeked", handleSeeked);
+    let isTouchScrolling = false;
+    let isKeyboardScrolling = false;
+    const scrollKeys = new Set([
+      "ArrowDown",
+      "ArrowUp",
+      "End",
+      "Home",
+      "PageDown",
+      "PageUp",
+      " ",
+    ]);
 
-    // Sync immediately in case the page mounts already scrolled into view
-    // (e.g. after a reload or a deep link to this section).
-    updateFromScroll();
+    const handleTouchStart = () => {
+      isTouchScrolling = true;
+      if (needsTouchMediaUnlock) unlockVideoForIos();
+    };
+
+    const stopTouchScrolling = () => {
+      isTouchScrolling = false;
+      cancelVideoUpdate();
+      video.pause();
+    };
+
+    const handleWindowBlur = () => {
+      isTouchScrolling = false;
+      isKeyboardScrolling = false;
+      cancelVideoUpdate();
+      video.pause();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!scrollKeys.has(event.key)) return;
+      const target = event.target;
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        (target instanceof HTMLElement &&
+          (target.isContentEditable ||
+            target.matches("button, input, select, textarea")))
+      ) {
+        return;
+      }
+      isKeyboardScrolling = true;
+      requestVideoUpdate();
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (!scrollKeys.has(event.key) || !isKeyboardScrolling) return;
+      isKeyboardScrolling = false;
+      cancelVideoUpdate();
+    };
+
+    const handleScroll = () => {
+      updatePageEndState();
+      if (isTouchScrolling || isKeyboardScrolling) requestVideoUpdate();
+    };
+
+    scrollContainer.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+    scrollContainer.addEventListener("wheel", requestVideoUpdate, {
+      passive: true,
+    });
+    scrollContainer.addEventListener("touchstart", handleTouchStart, {
+      passive: true,
+    });
+    scrollContainer.addEventListener("touchmove", requestVideoUpdate, {
+      passive: true,
+    });
+    scrollContainer.addEventListener("touchend", stopTouchScrolling, {
+      passive: true,
+    });
+    scrollContainer.addEventListener("touchcancel", stopTouchScrolling, {
+      passive: true,
+    });
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleWindowBlur);
+    video.addEventListener("loadedmetadata", updateVideoFromScroll);
+
+    // Sync once on mount for reloads and deep links. Subsequent frame changes
+    // only come from wheel, touchmove, or an actively held scroll key.
+    updatePageEndState();
+    updateVideoFromScroll();
 
     return () => {
-      scrollContainer.removeEventListener("scroll", updateFromScroll);
-      scrollContainer.removeEventListener("touchstart", unlockVideoForIos);
-      video.removeEventListener("seeked", handleSeeked);
-      if (iosSeekFrame !== undefined) {
-        cancelAnimationFrame(iosSeekFrame);
-      }
-      if (animationFrameRef.current !== undefined) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      scrollContainer.removeEventListener("scroll", handleScroll);
+      scrollContainer.removeEventListener("wheel", requestVideoUpdate);
+      scrollContainer.removeEventListener("touchstart", handleTouchStart);
+      scrollContainer.removeEventListener("touchmove", requestVideoUpdate);
+      scrollContainer.removeEventListener("touchend", stopTouchScrolling);
+      scrollContainer.removeEventListener("touchcancel", stopTouchScrolling);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleWindowBlur);
+      video.removeEventListener("loadedmetadata", updateVideoFromScroll);
+      cancelVideoUpdate();
     };
   }, []);
 
@@ -162,8 +198,6 @@ export default function ScrollVideoSection() {
     if (!video) return;
 
     video.pause();
-    video.currentTime = 0;
-    targetTimeRef.current = 0;
     setVideoStatus("ready");
   };
 
@@ -172,6 +206,14 @@ export default function ScrollVideoSection() {
     ready: "SCROLL TO EXPLORE",
     error: "FILM UNAVAILABLE",
   }[videoStatus];
+  const hintClassName = [
+    "scroll-video-hint",
+    videoStatus === "ready" ? "is-ready" : "",
+    videoStatus === "error" ? "has-error" : "",
+    isAtPageEnd ? "is-hidden" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div ref={sectionRef} className="section scroll-video-section">
@@ -189,9 +231,10 @@ export default function ScrollVideoSection() {
         />
 
         <div
-          className={`scroll-video-hint ${videoStatus === "ready" ? "is-ready" : ""} ${videoStatus === "error" ? "has-error" : ""}`}
+          className={hintClassName}
           role="status"
           aria-live="polite"
+          aria-hidden={isAtPageEnd}
         >
           <span className="scroll-video-line" />
           <span>{statusText}</span>
