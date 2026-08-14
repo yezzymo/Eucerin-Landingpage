@@ -16,17 +16,16 @@ export default function Section2() {
           Entdecke die faszinierende Welt des Mikrobioms
         </h2>
 
-        <p className="invite-body">
-          Hallo{name ? ` ${name}` : ""},
-        </p>
+        <p className="invite-body">Hallo{name ? ` ${name}` : ""},</p>
 
         <div className="invite-divider" />
 
         <p className="invite-body">
           Wir freuen uns unglaublich, dich auf eine immersive Reise in die Welt
-          von Probiom 8 einzuladen. Unter dem Motto 'Follow the 8' erwartet dich
-          ein einzigartiges Erlebnis, bei dem wir gemeinsam die spannende Welt
-          des Mikrobioms entdecken.
+          von Probiom 8 einzuladen. Unter dem Motto „Follow the 8" erwartet dich
+          ein einzigartiges Erlebnis rund um die faszinierende Welt des
+          Mikrobioms und eine revolutionäre Produktinnovation, die wir dir an
+          diesem Abend exklusiv vorstellen.
         </p>
 
         <div className="invite-details">
