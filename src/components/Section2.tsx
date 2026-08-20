@@ -22,7 +22,7 @@ export default function Section2() {
 
         <p className="invite-body">
           Wir freuen uns unglaublich, dich auf eine immersive Reise in die Welt
-          von Probiom 8 einzuladen. Unter dem Motto „Follow the 8" erwartet dich
+          von Probiom8 einzuladen. Unter dem Motto „Follow the 8" erwartet dich
           ein einzigartiges Erlebnis rund um die faszinierende Welt des
           Mikrobioms und eine revolutionäre Produktinnovation, die wir dir an
           diesem Abend exklusiv vorstellen.
